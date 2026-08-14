@@ -4,7 +4,7 @@
 import { Context } from "@deepseek-ai/cordis";
 import { Service } from "@deepseek-ai/cordis";
 import { remoteMethods } from "@deepseek-ai/dsh-typert-protocol";
-import { mkdtempSync, readdirSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -160,6 +160,18 @@ r = await tool.execute({ action: "conclude", treeId: "session:session-smoke", no
 const settleTree = plugin.store.trees.get("session:session-smoke");
 check("全部子节点结束后 plan 自动收尾为 ended", plugin.store.nodeById(settleTree, settlePlanId).status === "ended");
 
+// start 防链式挂载：当前节点是已结束的 decision 时，新分支挂到其父级
+r = await tool.execute({ action: "start", treeId: "session:session-smoke", title: "防链分支" }, exec);
+check("结束的 decision 之后 start 挂回父级（不产生线性链）", r.node.parentId === settlePlanId, JSON.stringify(r.node?.parentId));
+r = await tool.execute({ action: "conclude", treeId: "session:session-smoke", nodeId: r.nodeId, status: "success" }, exec);
+check("防链分支已结束", r.ok === true && r.node.status === "ended");
+// 手动制造"历史残留"（旧数据场景）：把 plan 改回 running 并落盘
+const stalePlan = plugin.store.nodeById(settleTree, settlePlanId);
+stalePlan.status = "running";
+stalePlan.endedAt = null;
+plugin.store.persist(settleTree);
+await plugin.store.writeChain; // 等写盘链 flush
+
 // 无 goal 会话 root 自动收尾：新建 newTree 后全 conclude → root 自动收尾
 r = await tool.execute({ action: "plan-root", title: "收尾测试主题", newTree: true }, exec);
 const settleTreeId = r.treeId;
@@ -252,6 +264,14 @@ await fiber2;
 const plugin2 = ctx2.get("researchTree");
 const snap2 = plugin2.getSnapshot();
 check("重启后树完整恢复", snap2.trees.length === snap.trees.length && snap2.trees.some((t) => t.treeId === "goal-1"));
+// 启动静态收尾：重启时自动纠正"任务已完成但节点仍进行中"的历史残留
+const settledStale = plugin2.store.trees.get("session:session-smoke");
+check("重启静态收尾：残留 running 的 plan 被自动收尾", plugin2.store.nodeById(settledStale, settlePlanId).status === "ended", plugin2.store.nodeById(settledStale, settlePlanId)?.status);
+check("静态收尾后已落盘", (() => {
+	const raw = JSON.parse(readFileSync(join(root, "session_session-smoke.json"), "utf8"));
+	const plan = raw.nodes.find((n) => n.id === settlePlanId);
+	return plan !== void 0 && plan.status === "ended";
+})());
 
 // ── 清理 ────────────────────────────────────────────────────────────────────
 await fiber2.dispose();
