@@ -134,7 +134,7 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 
 | action | 必填参数 | 可选参数 | 作用 |
 |---|---|---|---|
-| `plan-root` | `title`（研究主题） | `treeId` | 建根节点（会话没有树时建树） |
+| `plan-root` | `title`（研究主题） | `treeId`、`newTree` | 建根节点（会话没有树时建树）；`newTree=true` 在同一会话**开一棵新树**（转换研究主题用，旧树保留可切回） |
 | `plan-child` | `title` | `parentId`（默认当前节点）、`treeId` | 画预期分支（计划节点，虚线） |
 | `start` | — | `parentId`（默认当前节点）、`title`、`treeId` | 开实际探索分支（decision 节点，实线）；title 缺省时自动"探索：<父标题>" |
 | `conclude` | `nodeId`、`status`（success/failed/abandoned/blocked） | `reason`、`files` | 记录分支结论与原因 |
@@ -151,6 +151,15 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 4. `start` 给具体标题（如"尝试方法X"），不要与计划分支标题重复
 5. 中途才想起建树？随时 `plan-root`，把已做工作从对话历史**补记**成节点（无需复现对话）
 6. 上下文不够换了新会话？见[第 6 节](#6-跨会话续接重要)
+7. **中途转换研究主题**：`tree_node plan-root title=新主题 newTree=true`——在同一会话开一棵新树，
+   旧树保留在面板下拉里可随时切回查看/继续
+
+### 自动收尾（不需要手动做的部分）
+
+- 一个 plan 分支下的**全部子节点结束后，plan 自动结束**（不再残留"进行中"）
+- 无 goal 会话：全部子节点静止后 **root 自动结束**
+- **goal 完成/阻塞时：整树收尾**——所有"进行中"节点自动结束（显示"已结束"，不替你填研究结论）
+- 子代理结束事件**持久化配对**：即使中途重启 DSH，子代理节点的结束状态也不会丢
 
 ---
 

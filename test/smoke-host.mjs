@@ -148,6 +148,57 @@ ctx.emit("goal/changed", {
 });
 check("续接后 goal 事件不覆盖树绑定", plugin.store.sessionTree.get("session-smoke-2") === "session:session-smoke");
 
+// ── 自动收尾 ─────────────────────────────────────────────────────────────────
+// plan 自动收尾：plan 下所有 decision 结束后 plan 变 ended（不再残留"进行中"）
+// 注意：session-smoke 的绑定此刻是 goal-1，显式用 treeId 指回 session 树
+r = await tool.execute({ action: "plan-child", treeId: "session:session-smoke", parentId: rootId, title: "收尾测试计划" }, exec);
+const settlePlanId = r.nodeId;
+r = await tool.execute({ action: "start", treeId: "session:session-smoke", parentId: settlePlanId, title: "收尾测试执行" }, exec);
+const settleStepId = r.nodeId;
+check("收尾前 plan 为 running", plugin.store.nodeById(plugin.store.trees.get("session:session-smoke"), settlePlanId).status === "running");
+r = await tool.execute({ action: "conclude", treeId: "session:session-smoke", nodeId: settleStepId, status: "success" }, exec);
+const settleTree = plugin.store.trees.get("session:session-smoke");
+check("全部子节点结束后 plan 自动收尾为 ended", plugin.store.nodeById(settleTree, settlePlanId).status === "ended");
+
+// 无 goal 会话 root 自动收尾：新建 newTree 后全 conclude → root 自动收尾
+r = await tool.execute({ action: "plan-root", title: "收尾测试主题", newTree: true }, exec);
+const settleTreeId = r.treeId;
+check("newTree 在同一会话开新树（旧树保留）", settleTreeId !== "session:session-smoke" && plugin.store.trees.has("session:session-smoke"), settleTreeId);
+r = await tool.execute({ action: "start", title: "唯一分支" }, exec);
+r = await tool.execute({ action: "conclude", nodeId: r.nodeId, status: "success" }, exec);
+const settleNewTree = plugin.store.trees.get(settleTreeId);
+check("无 goal 会话：全部子节点静止后 root 自动收尾", plugin.store.rootNode(settleNewTree).status === "ended");
+
+// goal 完成 → 整树收尾（先在 goal 树上留一个 running 节点）
+ctx.emit("goal/changed", {
+	agent: { id: "session-g", session: { header: { id: "session-g" } } },
+	change: { operation: "create", ref: { id: "goal-g", revision: 1 }, goal: { id: "goal-g", objective: "goal 收尾测试", roundsStarted: 1 } }
+});
+r = await tool.execute({ action: "start", title: "goal 收尾分支" }, { agent: { id: "session-g", session: { header: { id: "session-g" } } } });
+check("goal 收尾前存在 running 节点", plugin.store.trees.get("goal-g").nodes.some((n) => n.status === "running"));
+ctx.emit("goal/changed", {
+	agent: { id: "session-g", session: { header: { id: "session-g" } } },
+	change: { operation: "complete", ref: { id: "goal-g", revision: 2 }, goal: { id: "goal-g", objective: "goal 收尾测试", roundsStarted: 2 } }
+});
+const goalGTree = plugin.store.trees.get("goal-g");
+check("goal 完成后整树收尾（running 节点全部 ended）", goalGTree.nodes.every((n) => n.status !== "running"), JSON.stringify(goalGTree.nodes.map((n) => n.status)));
+
+// ── subagent 配对持久化 ───────────────────────────────────────────────────────
+// 先把会话切回 session 树（绑定此刻是 goal-1）
+await tool.execute({ action: "resume", treeId: "session:session-smoke" }, exec);
+ctx.emit("agent/created", { agent: { id: "child-p", session: { header: { id: "child-p", parentSession: "session-smoke" } } } });
+ctx.emit("subagent/start", { id: "child-p", provider: "spawn", runId: "run-p", local: true });
+const settleSubTree = plugin.store.trees.get("session:session-smoke");
+const pendingRecBefore = (settleSubTree.pendingSubagents ?? []).find((r) => r.childId === "child-p");
+check("subagent 配对记录已持久化到树", pendingRecBefore !== void 0);
+const subNodeId = pendingRecBefore?.nodeId;
+// 模拟进程重启后内存配对丢失 → 仅靠树的持久化表兜底
+plugin.activeSubagent.clear();
+ctx.emit("subagent/end", { id: "child-p", provider: "spawn", runId: "run-p", local: true, stopReason: "completed" });
+const subP = plugin.store.trees.get("session:session-smoke").nodes.find((n) => n.id === subNodeId);
+check("重启后 end 事件经持久化表兜底配对", subP !== void 0 && subP.status === "ended");
+check("配对记录已清理", !(plugin.store.trees.get("session:session-smoke").pendingSubagents ?? []).some((r) => r.childId === "child-p"));
+
 // ── 快照内容与持久化 ─────────────────────────────────────────────────────────
 snap = plugin.getSnapshot();
 check("getSnapshot 返回树数组", Array.isArray(snap.trees) && snap.trees.length >= 2);
