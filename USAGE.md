@@ -86,24 +86,25 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 
 1. 从 `$DSH_HOME/profiles/web/package.json` 移除 `research-tree-plugin`（dependencies 与 bundles 两处）
 2. 删除 `profiles/web/node_modules/research-tree-plugin` 链接
-3. （可选）删除树数据目录（默认 `<启动目录>/research-vault/trees/`）以清空历史
+3. （可选）删除树数据目录（默认 `$DSH_HOME/research-tree/`）以清空历史
 
 ---
 
 ## 2. 树数据存储与配置
 
-- 默认存储目录：**`<dsh 服务启动目录>/research-vault/trees/`**，每棵树一个 JSON 文件（原子写，跨会话/重启不丢）
-- 修改位置：编辑插件包根目录的 `cordis.patch.yml`：
+- 默认存储目录：**`$DSH_HOME/research-tree/`**（DSH 数据根目录下，不依赖服务启动目录，
+  任何机器上行为一致；每棵树一个 JSON 文件，原子写，跨会话/重启不丢）
+- **固定到其他目录**（推荐，避免"换启动位置树不见了"）：在本机 profile 的用户层
+  `$DSH_HOME/profiles/web/cordis.patch.yml` 按 id 覆盖 `root`：
 
 ```yaml
-- insert:
-    - id: research-tree
-      name: 'research-tree-plugin'
-      config:
-        root: '/your/workspace/research-vault/trees'
+- id: research-tree
+  config:
+    root: 'D:/your/workspace/research-vault/trees'
 ```
 
-改完重启 dsh web 生效。
+- 改完重启 dsh web 生效。迁移历史数据：把旧目录下的 JSON 文件拷到新目录即可
+- 面板空状态会显示**当前存储目录**——发现"树不见了"时先看它
 
 ---
 
@@ -140,8 +141,10 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 | `conclude` | `nodeId`、`status`（success/failed/abandoned/blocked） | `reason`、`files` | 记录分支结论与原因 |
 | `annotate` | `nodeId` | `title`、`reason`、`files` | 补充说明/关联产出文件 |
 | `plan-mark` | `nodeId`、`relation`（on-track/revised/added） | `title` | 标记计划对照（修订/新增） |
-| `list` | — | — | 列出全部树（treeId/主题/节点数/更新时间），供续接检索 |
+| `list` | — | — | 列出全部树（treeId/主题/节点数/更新时间/是否归档），供续接检索 |
 | `resume` | `treeId` | `parentId`（挂载到指定节点） | 当前会话续接到已有树（跨会话继续同一研究） |
+| `archive` | `treeId` | `archived`（true=归档/false=恢复） | 归档/恢复一棵树（数据保留，从正常列表隐藏） |
+| `remove` | `treeId` | — | **永久删除**一棵树（文件移出为备份，不可从界面恢复；谨慎） |
 
 ### 使用纪律（工具描述中也已写明）
 
@@ -157,9 +160,14 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 ### 自动收尾（不需要手动做的部分）
 
 - 一个 plan 分支下的**全部子节点结束后，plan 自动结束**（不再残留"进行中"）
+- **计划自动汇总结论**：plan 收尾时自动统计子任务结论显示在节点上，
+  如"子任务完成：2 成功、1 失败"（无结论的计入"未标注"，不替你下判断）
 - 无 goal 会话：全部子节点静止后 **root 自动结束**
-- **goal 完成/阻塞时：整树收尾**——所有"进行中"节点自动结束（显示"已结束"，不替你填研究结论）
+- **goal 完成/阻塞时：整树收尾**——所有"进行中"节点自动结束（显示"已结束"）
+- **启动静态收尾**：每次 DSH 重启时自动修正历史数据里"任务已完成但节点仍进行中"的残留
 - 子代理结束事件**持久化配对**：即使中途重启 DSH，子代理节点的结束状态也不会丢
+- **防线性链**：在不指定 `parentId` 且当前节点是"已结束的决策"时，新分支自动挂回它的父级
+  （计划/主题），避免任务一条线串下去
 
 ---
 
@@ -182,19 +190,25 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 
 ### 节点
 
-- **颜色** = 状态：绿=成功 / 红=失败 / 橙=阻塞 / 灰=放弃 / 蓝脉冲=进行中 / 浅灰=未开始（右下角图例）
-- **虚线边框** = 计划（还没落地）；**黄色虚线** = 修订过的计划；实线 = 实际执行
+- **颜色** = 状态：绿=成功 / 红=失败 / 橙=阻塞 / 灰=放弃 / 蓝脉冲=进行中 / 浅灰=未开始
+- **线型** = 类型（右下角图例两行分区）：**实线** = 执行/探索、**虚线** = 计划（还没落地）、**黄色虚线** = 修订过的计划
 - 左上角角标：`改`（计划已修正）/ `新`（计划外新增）
 - 右上角 +/−：折叠/展开子树
-- **悬停**：浮层显示详情（类型/状态/结论/原因/计划对照/轮次/起止时间/产出文件）
+- **悬停**：浮层显示详情（类型/状态/结论/汇总/原因/计划对照/轮次/起止时间/产出文件）
 - **点击**：固定详情（浮层右上角 ✕ 或点击空白取消；悬停其他节点时固定框变半透明以示区分）
 - **双击**：跳转到该节点所属的会话
 - 当前节点：加粗虚线边框 + 自动跟随
 
-### 多树
+### 多树与归档
 
-- 顶部下拉切换树（带节点数；长名自动截断，悬停看全名）
+- 顶部下拉切换树（带节点数；长名自动截断，悬停看全名 + treeId）
 - 每棵树的视图（平移/缩放/展开状态）独立记忆
+- 面板底部「**归档**」：把当前树从正常列表**隐藏**（数据保留）；下拉中出现
+  「**已归档(N)**」按钮 → 点击进入归档视图（高亮为「正常」可切回），
+  归档树在这里查看/恢复
+- 面板底部「**删除**」：确认后**永久删除**当前树（文件移出为备份，可从存储目录找回）
+- 归档/删除后自动选中列表中的**相邻树**；该视图没有树时显示默认空状态页
+- 树的**生命周期独立于对话**：对话归档/删除不影响树；树的归档/删除由你在面板里主动决定
 
 ### 面板本身
 
@@ -227,7 +241,7 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
 
 ---
 
-## 7. 树的创建机制
+## 7. 树的创建机制与生命周期
 
 | 场景 | 行为 |
 |---|---|
@@ -235,6 +249,8 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
 | 无 goal 的会话 | **惰性建树**：agent 第一次调用 `tree_node` 才建树；短对话/一次性问答永不建树 |
 | 新会话继续旧研究 | 手动续接（见第 6 节） |
 | 中途才想起建树 | 随时补建 + 从对话历史补记，无需复现对话 |
+| 中途转换研究主题 | `plan-root title=新主题 newTree=true` 开新树（旧树保留可切回） |
+| 对话归档 / 对话删除 | **不影响树**——树的生命周期独立，由你在面板里归档/删除（见第 5 节） |
 
 ---
 
@@ -244,14 +260,16 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
 
 ```jsonc
 {
-  "treeId": "goal-xxx | session:xxx",
+  "treeId": "goal-xxx | session:xxx | session:xxx#N",
   "topic": "研究主题标题",
   "goalId": "... | null",
   "sessionId": "...",
   "createdAt": "ISO-8601",
   "updatedAt": "ISO-8601",
   "currentNodeId": "n7",
-  "shared": false,          // resume 续接后为 true
+  "shared": false,          // resume 续接 / newTree 独立树后为 true
+  "archived": false,        // 面板归档后为 true（数据保留，正常列表隐藏）
+  "pendingSubagents": [],   // 子代理结束事件的持久化配对表（重启不丢）
   "nodes": [
     {
       "id": "n1",
@@ -260,7 +278,7 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
       "title": "方向A：尝试X方法",
       "status": "pending | running | ended",        // 自动状态
       "conclusion": "success | failed | abandoned | blocked | null",  // 显式结论
-      "reason": "失败原因… | null",
+      "reason": "失败原因… | 计划汇总（子任务完成：N 成功）| null",
       "planRelation": "on-track | revised | added | null",
       "files": ["research-vault/…"],
       "startedAt": "ISO-8601 | null",
@@ -294,7 +312,15 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
 跳到该节点所属的会话（打开/切换）。精确滚动到消息（Level 2）暂未实现。
 
 **Q：树的数据能备份吗？**
-直接备份树数据目录（默认 `<启动目录>/research-vault/trees/`）下的 JSON 即可。
+直接备份树数据目录（默认 `$DSH_HOME/research-tree/`）下的 JSON 即可。
+
+**Q：归档的树去哪了？怎么找回？**
+归档 = 从正常列表隐藏（数据保留）。点面板头部「已归档(N)」按钮进入归档视图，
+选中后底部「恢复」即可取消归档。
+
+**Q：删除的树还能找回吗？**
+删除是软删除：树文件被改名为 `.deleted-<时间戳>` 留在存储目录，可从那里手动恢复；
+界面内不可恢复，删除前有确认弹窗。
 
 **Q：面板配色/字号能改吗？**
 能。改 `lib/client.js` 顶部的 CSS 常量（浅色暖调主题，硬编码，不跟随 DSH 主题）。
@@ -310,5 +336,5 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
 | 面板显示"暂时无法读取研究树" | 检查网关端点：`curl -X POST http://127.0.0.1:3080/api/researchTree/getSnapshot -H "content-type: application/json" -d '{"type":"client-request","rpcId":"t","method":"researchTree/getSnapshot","payload":{"args":{}}}'`，返回 `{ok:true,...}` 即正常 |
 | agent 说没有 `tree_node` 工具 | 工具对模型可见是会话级的：**新会话一定可见**；旧会话需另开 |
 | 树数据没落盘 | 检查存储目录是否可写（目录权限）；服务日志搜 `[research-tree]` |
-| 重启后树不见了 | 存储目录配置变了？默认是"服务启动目录/research-vault/trees"，在 `cordis.patch.yml` 里配 `root` 固定目录 |
+| 重启后树不见了 | 存储目录配置变了？默认是 `$DSH_HOME/research-tree/`；面板空状态会显示当前存储目录——确认与实际数据目录一致，或在 profile 用户层配 `root` 固定目录（见第 2 节） |
 | 改了 `lib/client.js` 不生效 | web profile 禁用 HMR，改代码必须**重启服务 + Ctrl+F5 强刷** |
