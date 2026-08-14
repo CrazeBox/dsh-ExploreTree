@@ -103,16 +103,19 @@ agent 侧工具用法、UI 操作指南、跨会话续接、FAQ 见 **[USAGE.md]
 
 ## 树数据存储
 
-默认存于 **`<dsh 服务启动目录>/research-vault/trees/`**（每棵树一个 JSON 文件）。
-可在插件包的 `cordis.patch.yml` 中配置 `config.root` 指定其他目录：
+默认存于 **`$DSH_HOME/research-tree/`**（DSH 数据根目录下，不依赖服务启动目录，
+任何机器上行为一致；每棵树一个 JSON 文件）。
+
+**固定到其他目录**（推荐，避免"换启动位置树不见了"）：在本机 profile 的用户层
+`$DSH_HOME/profiles/web/cordis.patch.yml` 按 id 覆盖 `root`：
 
 ```yaml
-- insert:
-    - id: research-tree
-      name: 'research-tree-plugin'
-      config:
-        root: '/your/workspace/research-vault/trees'
+- id: research-tree
+  config:
+    root: 'D:/your/workspace/research-vault/trees'
 ```
+
+改完重启 dsh web 生效。迁移历史数据：把旧目录下的 JSON 文件拷到新目录即可。
 
 ## 仓库结构
 
