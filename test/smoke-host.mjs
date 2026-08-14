@@ -159,6 +159,7 @@ check("收尾前 plan 为 running", plugin.store.nodeById(plugin.store.trees.get
 r = await tool.execute({ action: "conclude", treeId: "session:session-smoke", nodeId: settleStepId, status: "success" }, exec);
 const settleTree = plugin.store.trees.get("session:session-smoke");
 check("全部子节点结束后 plan 自动收尾为 ended", plugin.store.nodeById(settleTree, settlePlanId).status === "ended");
+check("plan 收尾时自动生成汇总结论", typeof plugin.store.nodeById(settleTree, settlePlanId).reason === "string" && plugin.store.nodeById(settleTree, settlePlanId).reason.includes("子任务完成"), JSON.stringify(plugin.store.nodeById(settleTree, settlePlanId).reason));
 
 // start 防链式挂载：当前节点是已结束的 decision 时，新分支挂到其父级
 r = await tool.execute({ action: "start", treeId: "session:session-smoke", title: "防链分支" }, exec);
