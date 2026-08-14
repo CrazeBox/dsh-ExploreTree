@@ -261,6 +261,14 @@ check("remove 后树文件移出（软删除备份）", !existsSync(fileX) || ((
 // 刷新快照基准（删除后的状态，供重启恢复断言对比）
 snap = plugin.getSnapshot();
 
+// 制造"孤儿子代理"（进程中断遗留）：running 子代理 + 配对表残留，一并落盘
+// 放在所有其他操作之后，避免后续 settleAncestors 把它提前收掉
+ctx.emit("agent/created", { agent: { id: "child-orphan", session: { header: { id: "child-orphan", parentSession: "session-smoke" } } } });
+ctx.emit("subagent/start", { id: "child-orphan", provider: "spawn", runId: "run-orphan", local: true });
+const orphanNode = plugin.store.trees.get("session:session-smoke").nodes.find((n) => n.title === "子代理：spawn" && n.status === "running");
+check("孤儿子代理节点已创建（running + 配对表残留）", orphanNode !== void 0 && plugin.store.trees.get("session:session-smoke").pendingSubagents.some((r) => r.childId === "child-orphan"));
+await plugin.store.writeChain;
+
 // ── 快照内容与持久化 ─────────────────────────────────────────────────────────
 snap = plugin.getSnapshot();
 check("getSnapshot 返回树数组", Array.isArray(snap.trees) && snap.trees.length >= 2);
@@ -283,6 +291,11 @@ check("重启后树完整恢复", snap2.trees.length === snap.trees.length && sn
 // 启动静态收尾：重启时自动纠正"任务已完成但节点仍进行中"的历史残留
 const settledStale = plugin2.store.trees.get("session:session-smoke");
 check("重启静态收尾：残留 running 的 plan 被自动收尾", plugin2.store.nodeById(settledStale, settlePlanId).status === "ended", plugin2.store.nodeById(settledStale, settlePlanId)?.status);
+check("启动孤儿清理：running 子代理被标记进程中断", (() => {
+	const n = settledStale.nodes.find((node) => node.title === "子代理：spawn" && node.conclusion === "abandoned" && node.reason === "进程中断（未完成）");
+	return n !== void 0;
+})(), JSON.stringify(settledStale.nodes.filter((n) => n.type === "subagent").map((n) => ({ s: n.status, c: n.conclusion }))));
+check("启动孤儿清理：配对表已清空", (settledStale.pendingSubagents ?? []).length === 0);
 check("静态收尾后已落盘", (() => {
 	const raw = JSON.parse(readFileSync(join(root, "session_session-smoke.json"), "utf8"));
 	const plan = raw.nodes.find((n) => n.id === settlePlanId);
