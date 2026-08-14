@@ -47,9 +47,9 @@ await fiber;
 check("插件激活（inject tools/goals 解析）", ctx.get("researchTree") !== void 0);
 
 const plugin = ctx.get("researchTree");
-check("Remote 标记：getSnapshot + annotateNode", (() => {
+check("Remote 标记：getSnapshot/annotateNode/archiveTree/removeTree", (() => {
 	const methods = remoteMethods(plugin).map((m) => m.method).sort();
-	return methods.length === 2 && methods[0] === "annotateNode" && methods[1] === "getSnapshot";
+	return methods.length === 4 && methods[0] === "annotateNode" && methods[1] === "archiveTree" && methods[2] === "getSnapshot" && methods[3] === "removeTree";
 })(), JSON.stringify(remoteMethods(plugin).map((m) => m.method)));
 
 const tools = ctx.get("tools");
@@ -244,6 +244,21 @@ ctx.emit("goal/changed", {
 	change: { operation: "create", ref: { id: "goal-b", revision: 1 }, goal: { id: "goal-b", objective: "B 的目标", roundsStarted: 1 } }
 });
 check("B 会话 goal 事件不覆盖续接绑定", plugin.store.sessionTree.get("session-b") === treeY);
+
+// ── 树的归档/删除（生命周期独立于对话） ───────────────────────────────────────
+r = await tool.execute({ action: "archive", treeId: treeX, archived: true }, execB);
+check("archive 归档树（数据保留）", r.ok === true && r.archived === true && plugin.store.trees.has(treeX));
+const snapArch = plugin.getSnapshot();
+check("快照携带 archived 标记", snapArch.trees.find((t) => t.treeId === treeX).archived === true);
+r = await tool.execute({ action: "archive", treeId: treeX, archived: false }, execB);
+check("archive 恢复树", r.ok === true && r.archived === false);
+r = await tool.execute({ action: "remove", treeId: treeX }, execB);
+check("remove 永久删除树（内存+绑定清理）", r.ok === true && !plugin.store.trees.has(treeX) && ![...plugin.store.sessionTree.values()].includes(treeX));
+await plugin.store.writeChain; // 等软删除完成
+const fileX = join(root, treeX.replace(/[<>:"/\\|?*]/g, "_") + ".json");
+check("remove 后树文件移出（软删除备份）", !existsSync(fileX) || (() => { const names = readdirSync(root); return names.some((n) => n.startsWith(treeX.replace(/[<>:"/\\|?*]/g, "_") + ".json.deleted-")); })());
+// 刷新快照基准（删除后的状态，供重启恢复断言对比）
+snap = plugin.getSnapshot();
 
 // ── 快照内容与持久化 ─────────────────────────────────────────────────────────
 snap = plugin.getSnapshot();
