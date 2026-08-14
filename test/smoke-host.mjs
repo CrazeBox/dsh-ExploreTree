@@ -199,6 +199,40 @@ const subP = plugin.store.trees.get("session:session-smoke").nodes.find((n) => n
 check("重启后 end 事件经持久化表兜底配对", subP !== void 0 && subP.status === "ended");
 check("配对记录已清理", !(plugin.store.trees.get("session:session-smoke").pendingSubagents ?? []).some((r) => r.childId === "child-p"));
 
+// ── 转主题 + 跨会话续接（用户场景：A 会话 newTree 转主题 → B 会话 resume 继续画） ──
+const execA = { agent: { id: "session-a", session: { header: { id: "session-a" } } } };
+r = await tool.execute({ action: "plan-root", title: "主题X" }, execA);          // A 建树 X
+const treeX = r.treeId;
+r = await tool.execute({ action: "plan-root", title: "主题Y", newTree: true }, execA);  // A 转主题开树 Y
+const treeY = r.treeId;
+check("A 会话转主题后绑定到新树 Y", plugin.store.sessionTree.get("session-a") === treeY && treeY !== treeX);
+r = await tool.execute({ action: "start", title: "Y 的第一个分支" }, execA);
+check("A 会话新分支落在树 Y", r.ok === true && r.treeId === treeY);
+
+// A 会话仍有活跃 goal → goal 事件不应把绑定拉回（shared 保护）
+ctx.emit("goal/changed", {
+	agent: execA.agent,
+	change: { operation: "create", ref: { id: "goal-a", revision: 1 }, goal: { id: "goal-a", objective: "A 的旧目标", roundsStarted: 1 } }
+});
+check("转主题树不受旧 goal 事件影响（绑定稳定）", plugin.store.sessionTree.get("session-a") === treeY);
+
+// A 上下文满 → 新会话 B 转接
+const execB = { agent: { id: "session-b", session: { header: { id: "session-b" } } } };
+r = await tool.execute({ action: "list" }, execB);
+check("B 用 list 能找到树 Y", r.ok === true && r.trees.some((t) => t.treeId === treeY));
+r = await tool.execute({ action: "resume", treeId: treeY }, execB);
+check("B resume 续接树 Y", r.ok === true && r.treeId === treeY && r.nodes.length >= 1);
+r = await tool.execute({ action: "start", title: "B 会话续接的新分支" }, execB);
+check("B 会话新分支落在树 Y（继续绘制）", r.ok === true && r.treeId === treeY);
+const snapY = plugin.getSnapshot().trees.find((t) => t.treeId === treeY);
+check("树 Y 同时含 A/B 两会话的节点（同一研究继续生长）", snapY.nodes.some((n) => n.title === "Y 的第一个分支") && snapY.nodes.some((n) => n.title === "B 会话续接的新分支"));
+// B 会话建 goal 也不干扰
+ctx.emit("goal/changed", {
+	agent: execB.agent,
+	change: { operation: "create", ref: { id: "goal-b", revision: 1 }, goal: { id: "goal-b", objective: "B 的目标", roundsStarted: 1 } }
+});
+check("B 会话 goal 事件不覆盖续接绑定", plugin.store.sessionTree.get("session-b") === treeY);
+
 // ── 快照内容与持久化 ─────────────────────────────────────────────────────────
 snap = plugin.getSnapshot();
 check("getSnapshot 返回树数组", Array.isArray(snap.trees) && snap.trees.length >= 2);
