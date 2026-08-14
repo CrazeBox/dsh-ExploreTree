@@ -277,6 +277,35 @@ await new Promise((resolve) => setTimeout(resolve, 100));
 const files = readdirSync(root).filter((f) => f.endsWith(".json"));
 check("持久化落盘（每树一文件）", files.length >= 2, files.join(","));
 
+// ── 自动记录员（scribing） ─────────────────────────────────────────────────────
+const scribeAgent = { id: "session-scribe", session: { header: { id: "session-scribe" } } };
+const scribeSessionObj = { header: { id: "session-scribe" } };
+r = await tool.execute({ action: "plan-root", title: "记录员测试研究" }, { agent: scribeAgent });
+const scribeTreeId = r.treeId;
+ctx.emit("session/event", scribeSessionObj, { type: "assistant/message", content: [{ type: "text", text: "推导第九轮：尝试新的 Kempe 链构造" }] });
+check("记录员收集会话事件摘要", (plugin.scribe.buffer.get("session-scribe") ?? []).length === 1);
+// 树落后 20 分钟 → 触发补记；无 LLM 能力时静默跳过并清缓冲
+const scribeTreeObj = plugin.store.trees.get(scribeTreeId);
+scribeTreeObj.updatedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+ctx.emit("session/event", scribeSessionObj, { type: "user/message", content: "继续推进这个方向" });
+plugin.maybeScribe("session-scribe"); // 手动触发（绕过 30s 节流）
+await new Promise((resolve) => setTimeout(resolve, 80));
+check("无 LLM 能力时静默跳过且清空缓冲", (plugin.scribe.buffer.get("session-scribe") ?? []).length === 0);
+// applyScribeOps：直接应用 LLM 风格操作（actor=auto-scribe）
+plugin.applyScribeOps("session-scribe", [
+	{ action: "start", title: "第九轮：Kempe 链构造" },
+	{ action: "conclude", title: "第九轮：Kempe 链构造", status: "success", reason: "构造成功，缺口闭合" }
+]);
+const scribeTreeAfter = plugin.store.trees.get(scribeTreeId);
+check("记录员 start 建节点（auto-scribe）", scribeTreeAfter.nodes.some((n) => n.title === "第九轮：Kempe 链构造" && n.actor === "auto-scribe"));
+check("记录员 conclude 按标题匹配收尾", scribeTreeAfter.nodes.some((n) => n.title === "第九轮：Kempe 链构造" && n.status === "ended" && n.conclusion === "success"));
+// parseScribeOps 容错解析
+const parsedOps = plugin.parseScribeOps('好的，以下是操作：\n[{"action":"start","title":"A"},{"action":"conclude","title":"B","status":"failed","reason":"r"}] 结束');
+check("记录员容错解析 LLM 输出", parsedOps.length === 2 && parsedOps[0].action === "start" && parsedOps[1].status === "failed");
+check("记录员忽略非法操作", plugin.parseScribeOps('{"action":"remove"}').length === 0);
+// 刷新快照基准（scribing 建了新树，供重启恢复断言对比）
+snap = plugin.getSnapshot();
+
 // ── 重新加载（模拟跨会话恢复） ───────────────────────────────────────────────
 await fiber.dispose();
 delete ctx.stop;

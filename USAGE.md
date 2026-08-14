@@ -157,7 +157,7 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 7. **中途转换研究主题**：`tree_node plan-root title=新主题 newTree=true`——在同一会话开一棵新树，
    旧树保留在面板下拉里可随时切回查看/继续
 
-### 自动收尾（不需要手动做的部分）
+### 自动收尾与自动记录员（不需要手动做的部分）
 
 - 一个 plan 分支下的**全部子节点结束后，plan 自动结束**（不再残留"进行中"）
 - **计划自动汇总结论**：plan 收尾时自动统计子任务结论显示在节点上，
@@ -165,6 +165,10 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 - 无 goal 会话：全部子节点静止后 **root 自动结束**
 - **goal 完成/阻塞时：整树收尾**——所有"进行中"节点自动结束（显示"已结束"）
 - **启动静态收尾**：每次 DSH 重启时自动修正历史数据里"任务已完成但节点仍进行中"的残留
+- **自动记录员（scribe）**：插件监听会话事件，当树的更新时间落后对话活动超过 10 分钟时，
+  后台自动调用 LLM 把新事件压缩成树操作并补记（start/conclude/annotate/plan-child，
+  节点标记 `auto-scribe`）——即使 agent 忘了记录，树也会自动跟上；
+  手动记录优先，自动补记只填空白（可在 `cordis.patch.yml` 配 `scribeEnabled: false` 关闭）
 - 子代理结束事件**持久化配对**：即使中途重启 DSH，子代理节点的结束状态也不会丢
 - **防线性链**：在不指定 `parentId` 且当前节点是"已结束的决策"时，新分支自动挂回它的父级
   （计划/主题），避免任务一条线串下去
