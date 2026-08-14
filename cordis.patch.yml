@@ -4,8 +4,7 @@
 - insert:
     - id: research-tree
       name: 'research-tree-plugin'
-      # 可选配置：树数据存储目录。
-      # 不配置时默认使用 <dsh 服务启动目录>/research-vault/trees。
-      # 示例：
-      # config:
-      #   root: 'D:/your/workspace/research-vault/trees'
+      # 树数据存储目录。建议显式配置固定目录（不依赖服务启动目录，
+      # 否则换启动位置会导致"树不见了"）。其他机器请改成自己的路径。
+      config:
+        root: 'D:/dsh-explore/research-vault/trees'
