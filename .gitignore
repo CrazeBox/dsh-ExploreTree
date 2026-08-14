@@ -1,0 +1,6 @@
+# 依赖与构建产物
+node_modules/
+
+# 临时文件
+*.tmp
+*.log

@@ -1,0 +1,11 @@
+# research-tree-plugin 的 Host 组合行（bundle patch）。
+# 随 profile 启动自动加载：注册 tree_node 工具、订阅 goal/subagent/workflow 事件、
+# 向 Web 端暴露 researchTree 网关端点（客户端经 connection.rpc 调用）。
+- insert:
+    - id: research-tree
+      name: 'research-tree-plugin'
+      # 可选配置：树数据存储目录。
+      # 不配置时默认使用 <dsh 服务启动目录>/research-vault/trees。
+      # 示例：
+      # config:
+      #   root: 'D:/your/workspace/research-vault/trees'

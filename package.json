@@ -1,0 +1,29 @@
+{
+  "name": "research-tree-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "研究进度树：长期探究过程的可视化树状图（DSH 插件：Host 记录 + Web 侧边栏实时展示）",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "dependencies": {
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.6"
+  }
+}
