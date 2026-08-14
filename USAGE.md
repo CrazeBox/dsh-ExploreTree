@@ -106,6 +106,17 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 - 改完重启 dsh web 生效。迁移历史数据：把旧目录下的 JSON 文件拷到新目录即可
 - 面板空状态会显示**当前存储目录**——发现"树不见了"时先看它
 
+**自动记录员（scribe）配置**（可选，默认开启）：树更新落后对话活动超过阈值时，
+插件自动调 LLM 补记。可在 profile 用户层覆盖：
+
+```yaml
+- id: research-tree
+  config:
+    scribeEnabled: true      # false 关闭自动补记
+    scribeLagMs: 600000      # 树落后阈值（默认 10 分钟）
+    scribeCooldownMs: 300000 # 两次补记最小间隔（默认 5 分钟）
+```
+
 ---
 
 ## 3. 快速开始
@@ -190,6 +201,7 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 | 点击面板内任意处 | **进入焦点模式**（边框高亮）：之后**滚轮 = 缩放**（锚定鼠标位置），不干扰页面缩放 |
 | 点击面板外 / Esc | 退出焦点模式；焦点外 Ctrl/Cmd+滚轮仍可缩放 |
 | 头部 − / % / + 按钮 | 缩放（25%~250%），点 % 复位 100% |
+| 头部 **⇄ / ⇅** 按钮 | **布局方向切换**：横向（根在左，宽分支友好）/ 竖向（根在顶，深链直观）；选择记忆，跨会话保持 |
 | 打开面板 / 切换树 | 自动居中；当前节点变化时自动平移到视口中心 |
 
 ### 节点
