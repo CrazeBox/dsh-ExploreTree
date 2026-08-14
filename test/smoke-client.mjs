@@ -78,6 +78,18 @@ check("画布尺寸容纳层级", layout.width > 300 && layout.height > 100, `w=
 const collapsedLayout = D.computeLayout(nodes, new Set(["plan-1"]));
 check("折叠后子节点不再布局", !collapsedLayout.pos.has("step-1") && collapsedLayout.pos.has("step-2"));
 
+// 竖向布局：根在顶（y 最小），深度方向向下
+const vLayout = D.computeLayout(nodes, new Set(), "v");
+check("竖向布局：根在最顶（y 最小）", Math.min(...nodes.map((n) => vLayout.pos.get(n.id).y)) === vLayout.pos.get("root-1").y);
+check("竖向布局：子节点在父下方", vLayout.pos.get("plan-1").y > vLayout.pos.get("root-1").y);
+check("竖向布局：父节点水平居中于子节点", (() => {
+	const rootX = vLayout.pos.get("root-1").x + vLayout.pos.get("root-1").w / 2;
+	const xs = [vLayout.pos.get("plan-1").x, vLayout.pos.get("plan-2").x].map((x) => x + 156 / 2);
+	return Math.abs(rootX - (xs[0] + xs[1]) / 2) < 1;
+})());
+const vEdge = D.edgePath(vLayout.pos.get("root-1"), vLayout.pos.get("plan-1"), true);
+check("竖向布局连线为垂直贝塞尔", typeof vEdge === "string" && vEdge.startsWith("M ") && vEdge.includes(" C "), vEdge);
+
 // ── 连线 ─────────────────────────────────────────────────────────────────────
 const edge = D.edgePath(pos.get("root-1"), pos.get("plan-1"));
 check("连线为贝塞尔路径", typeof edge === "string" && edge.startsWith("M ") && edge.includes(" C "), edge);
