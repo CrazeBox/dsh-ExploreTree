@@ -84,6 +84,14 @@ check("annotate 补 desc", r.ok === true && r.node.desc === "补写过程说明"
 r = await tool.execute({ action: "annotate", nodeId: stepId, desc: "" }, exec);
 check("annotate 清空 desc（空串 → null）", r.ok === true && r.node.desc === null);
 
+// annotateNode 网关直调（面板内编辑写回用）：title/desc 可写、desc 空串清空、未知节点报错
+r = plugin.annotateNode("session:session-smoke", stepId, null, null, "改后的标题", "改后的说明");
+check("annotateNode 直调改 title/desc", r.ok === true && r.node.title === "改后的标题" && r.node.desc === "改后的说明");
+r = plugin.annotateNode("session:session-smoke", stepId, null, null, null, "");
+check("annotateNode 直调清空 desc", r.ok === true && r.node.desc === null);
+r = plugin.annotateNode("session:session-smoke", "no-such-node", null, null, "x", "y");
+check("annotateNode 直调未知节点报错", r.ok === false && typeof r.error === "string");
+
 let threw = false;
 try {
 	await tool.execute({ action: "conclude", nodeId: stepId, status: "maybe" }, exec);
