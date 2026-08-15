@@ -65,17 +65,24 @@ check("plan-root 建根", r.ok === true && r.nodeId.startsWith("root-"), JSON.st
 check("节点锚点（会话+时间）已记录", r.ok === true && r.node.anchor !== null && r.node.anchor.sessionId === "session-smoke" && typeof r.node.anchor.ts === "string", JSON.stringify(r.node?.anchor));
 const rootId = r.nodeId;
 
-r = await tool.execute({ action: "plan-child", parentId: rootId, title: "方向A：方法X" }, exec);
+r = await tool.execute({ action: "plan-child", parentId: rootId, title: "方向A：方法X", desc: "可行性证据链调研" }, exec);
 check("plan-child 建计划分支", r.ok === true && r.nodeId.startsWith("plan-"));
+check("plan-child 携带 desc", r.ok === true && r.node.desc === "可行性证据链调研");
 const planId = r.nodeId;
 
-r = await tool.execute({ action: "start", parentId: planId, title: "尝试方法X" }, exec);
+r = await tool.execute({ action: "start", parentId: planId, title: "尝试方法X", desc: "先读综述，再写实现并跑基准" }, exec);
 check("start 开实际分支", r.ok === true && r.node.status === "running" && r.currentNodeId === r.nodeId);
+check("start 携带 desc", r.ok === true && r.node.desc === "先读综述，再写实现并跑基准");
 const stepId = r.nodeId;
 
 r = await tool.execute({ action: "conclude", nodeId: stepId, status: "failed", reason: "收敛性差", files: ["research-vault/x.md"] }, exec);
 check("conclude 记失败结论", r.ok === true && r.node.conclusion === "failed" && r.node.status === "ended" && r.node.reason === "收敛性差");
 check("conclude 关联文件", Array.isArray(r.node.files) && r.node.files.length === 1);
+
+r = await tool.execute({ action: "annotate", nodeId: stepId, desc: "补写过程说明" }, exec);
+check("annotate 补 desc", r.ok === true && r.node.desc === "补写过程说明");
+r = await tool.execute({ action: "annotate", nodeId: stepId, desc: "" }, exec);
+check("annotate 清空 desc（空串 → null）", r.ok === true && r.node.desc === null);
 
 let threw = false;
 try {
@@ -293,15 +300,16 @@ await new Promise((resolve) => setTimeout(resolve, 80));
 check("无 LLM 能力时静默跳过且清空缓冲", (plugin.scribe.buffer.get("session-scribe") ?? []).length === 0);
 // applyScribeOps：直接应用 LLM 风格操作（actor=auto-scribe）
 plugin.applyScribeOps("session-scribe", [
-	{ action: "start", title: "第九轮：Kempe 链构造" },
+	{ action: "start", title: "第九轮：Kempe 链构造", desc: "构造新的 Kempe 链并验证缺口闭合" },
 	{ action: "conclude", title: "第九轮：Kempe 链构造", status: "success", reason: "构造成功，缺口闭合" }
 ]);
 const scribeTreeAfter = plugin.store.trees.get(scribeTreeId);
 check("记录员 start 建节点（auto-scribe）", scribeTreeAfter.nodes.some((n) => n.title === "第九轮：Kempe 链构造" && n.actor === "auto-scribe"));
+check("记录员 start 携带 desc", scribeTreeAfter.nodes.some((n) => n.title === "第九轮：Kempe 链构造" && n.desc === "构造新的 Kempe 链并验证缺口闭合"));
 check("记录员 conclude 按标题匹配收尾", scribeTreeAfter.nodes.some((n) => n.title === "第九轮：Kempe 链构造" && n.status === "ended" && n.conclusion === "success"));
 // parseScribeOps 容错解析
-const parsedOps = plugin.parseScribeOps('好的，以下是操作：\n[{"action":"start","title":"A"},{"action":"conclude","title":"B","status":"failed","reason":"r"}] 结束');
-check("记录员容错解析 LLM 输出", parsedOps.length === 2 && parsedOps[0].action === "start" && parsedOps[1].status === "failed");
+const parsedOps = plugin.parseScribeOps('好的，以下是操作：\n[{"action":"start","title":"A","desc":"d"},{"action":"conclude","title":"B","status":"failed","reason":"r"}] 结束');
+check("记录员容错解析 LLM 输出", parsedOps.length === 2 && parsedOps[0].action === "start" && parsedOps[0].desc === "d" && parsedOps[1].status === "failed");
 check("记录员忽略非法操作", plugin.parseScribeOps('{"action":"remove"}').length === 0);
 // 刷新快照基准（scribing 建了新树，供重启恢复断言对比）
 snap = plugin.getSnapshot();

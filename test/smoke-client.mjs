@@ -98,6 +98,7 @@ check("连线为贝塞尔路径", typeof edge === "string" && edge.startsWith("M
 const step1 = nodes.find((n) => n.id === "step-1");
 check("失败节点状态映射", D.nodeState(step1) === "failed");
 check("失败节点副标题 = 原因", D.nodeDesc(step1) === "收敛性差");
+check("desc 优先于原因显示", D.nodeDesc({ ...step1, desc: "跑了三组对照实验" }) === "跑了三组对照实验");
 const step2 = nodes.find((n) => n.id === "step-2");
 check("进行中节点副标题", D.nodeDesc(step2) === "进行中…");
 // 结论语义 = 线的命运：无 reason 时按命运给默认副标题

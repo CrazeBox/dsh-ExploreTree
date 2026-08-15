@@ -147,10 +147,10 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 | action | 必填参数 | 可选参数 | 作用 |
 |---|---|---|---|
 | `plan-root` | `title`（研究主题） | `treeId`、`newTree` | 建根节点（会话没有树时建树）；`newTree=true` 在同一会话**开一棵新树**（转换研究主题用，旧树保留可切回） |
-| `plan-child` | `title` | `parentId`（默认当前节点）、`treeId` | 画预期分支（计划节点，虚线） |
-| `start` | — | `parentId`（默认当前节点）、`title`、`treeId` | 开实际探索分支（decision 节点，实线）；title 缺省时自动"探索：<父标题>" |
+| `plan-child` | `title`（短标签 ≤12 字） | `parentId`（默认当前节点）、`treeId`、`desc` | 画预期分支（计划节点，虚线） |
+| `start` | — | `parentId`（默认当前节点）、`title`（短标签）、`treeId`、`desc` | 开实际探索分支（decision 节点，实线）；title 缺省时自动"探索：<父标题>" |
 | `conclude` | `nodeId`、`status`（success/failed/abandoned/blocked） | `reason`、`files` | 记录分支结论（线的命运：走通/走不通/没走完/卡住）与原因 |
-| `annotate` | `nodeId` | `title`、`reason`、`files` | 补充说明/关联产出文件 |
+| `annotate` | `nodeId` | `title`、`desc`、`reason`、`files` | 补充说明（标题/描述/原因/关联产出文件） |
 | `plan-mark` | `nodeId`、`relation`（on-track/revised/added） | `title` | 标记计划对照（修订/新增） |
 | `list` | — | — | 列出全部树（treeId/主题/节点数/更新时间/是否归档），供续接检索 |
 | `resume` | `treeId` | `parentId`（挂载到指定节点） | 当前会话续接到已有树（跨会话继续同一研究） |
@@ -167,6 +167,8 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 6. 上下文不够换了新会话？见[第 6 节](#6-跨会话续接重要)
 7. **中途转换研究主题**：`tree_node plan-root title=新主题 newTree=true`——在同一会话开一棵新树，
    旧树保留在面板下拉里可随时切回查看/继续
+8. **标题与描述分层**：`title` 写短标签（≤12 字，节点上截断显示）；「在这个节点干了什么」写 `desc`
+   （长文本，悬停/点击详情看全文）；结论原因写 `reason`——三件事分开写，别都塞进标题
 
 ### 自动收尾与自动记录员（不需要手动做的部分）
 
@@ -210,8 +212,10 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 - **线型 = 是否定局**（右下角图例）：**实线** = 有结论/进行中（走通和走不通都是"有结论"）；
   **虚线** = 未定局（计划还没落地、卡住、没走完、未开始）；**黄色虚线** = 修订过的计划
 - 左上角角标：✕（此路不通）/ `改`（计划已修正）/ `新`（计划外新增）
+- **标题与描述分层**：卡片第一行 = 短标题（截断 11 字）；第二行 = `desc`（在这个节点干了什么，
+  截断显示；无 desc 时回退显示原因/状态文案）；完整内容在悬停/点击详情里看全文
 - 右上角 +/−：折叠/展开子树
-- **悬停**：浮层显示详情（类型/状态/结论/汇总/原因/计划对照/轮次/起止时间/产出文件）
+- **悬停**：浮层显示详情（类型/状态/说明/结论/汇总/原因/计划对照/轮次/起止时间/产出文件）
 - **点击**：固定详情（浮层右上角 ✕ 或点击空白取消；悬停其他节点时固定框变半透明以示区分）
 - **双击**：跳转到该节点所属的会话
 - 当前节点：加粗虚线边框 + 自动跟随
@@ -294,6 +298,7 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
       "type": "root | plan | decision | subagent | workflow | job | skill | goal-round",
       "parentId": "n0 | null",
       "title": "方向A：尝试X方法",
+      "desc": "在这个节点干了什么（长文本，可选）| null",
       "status": "pending | running | ended",        // 自动状态
       "conclusion": "success | failed | abandoned | blocked | null",  // 显式结论（线的命运：走通/走不通/没走完/卡住）
       "reason": "走不通的原因… | 计划汇总（子任务完成：N 走通）| null",
