@@ -108,6 +108,7 @@ check("没走完副标题", D.nodeDesc(fate("abandoned")) === "没走完");
 check("卡住副标题", D.nodeDesc(fate("blocked")) === "暂时卡住");
 check("走通副标题", D.nodeDesc(fate("success")) === "走通");
 check("状态文案 = 线的命运（走通/走不通/卡住/没走完）", D.STATE_LABELS.success === "走通" && D.STATE_LABELS.failed === "走不通" && D.STATE_LABELS.blocked === "卡住" && D.STATE_LABELS.abandoned === "没走完");
+check("无内容子代理显示类型文案（不显示已结束）", D.nodeDesc({ id: "s", type: "subagent", parentId: null, title: "子代理：spawn", status: "ended", conclusion: null, desc: null, reason: null, planRelation: null }) === "子代理");
 check("截断函数", D.truncate("一二三四五六七八九十", 6) === "一二三四五…");
 check("六种状态色齐全", Object.keys(D.STATE_COLORS).length === 6 && Object.keys(D.STATE_LABELS).length === 6);
 

@@ -131,15 +131,33 @@ r = await tool.execute({ action: "start", title: "子代理宿主分支" }, exec
 // 注意：MockGoals.get 返回 null -> goalId=null -> session 树
 ctx.emit("agent/created", { agent: { id: "child-1", session: { header: { id: "child-1", parentSession: "session-smoke" } } } });
 ctx.emit("subagent/start", { id: "child-1", provider: "spawn", runId: "run-1", local: true });
-ctx.emit("subagent/end", { id: "child-1", provider: "spawn", runId: "run-1", local: true, stopReason: "failed: boom" });
+// 子代理会话事件（任务）在 start 与 end 之间被缓冲 → 补全 desc
+ctx.emit("session/event", { header: { id: "child-1" } }, { type: "user/message", content: [{ type: "text", text: "攻击路线 A：构造 K_7 极小反例" }] });
+ctx.emit("session/event", { header: { id: "child-1" } }, { type: "assistant/message", content: [{ type: "text", text: "开始拆解临界图结构" }] });
+ctx.emit("subagent/end", {
+	id: "child-1", provider: "spawn", runId: "run-1", local: true, stopReason: "failed: boom",
+	lastAssistantMessage: [{ type: "text", text: "发现构造在第 3 步断裂" }]
+});
+// 成功收尾的子代理：无任务缓冲时 desc 留空，reason = 结果（最终输出截取）
+ctx.emit("agent/created", { agent: { id: "child-2", session: { header: { id: "child-2", parentSession: "session-smoke" } } } });
+ctx.emit("subagent/start", { id: "child-2", provider: "spawn", runId: "run-2", local: true });
+ctx.emit("subagent/end", {
+	id: "child-2", provider: "spawn", runId: "run-2", local: true, stopReason: "completed",
+	lastAssistantMessage: [{ type: "text", text: "路线 B 的证明缺口闭合，写了 3 页推导" }]
+});
 
 snap = plugin.getSnapshot();
 // 会话当前树 = goal-1（goal 事件把会话绑定到 goal 树；resolveTree 以绑定为准，
 // 工具操作与自动节点归属一致）
 const autoTree = snap.trees.find((t) => t.treeId === "goal-1");
 check("subagent 自动节点生成（挂在会话当前树）", autoTree !== void 0 && autoTree.nodes.some((n) => n.type === "subagent"));
-const subNode = autoTree?.nodes.find((n) => n.type === "subagent");
-check("subagent 失败自动结论", subNode !== void 0 && subNode.conclusion === "failed" && subNode.reason.includes("failed: boom"));
+const subNode = autoTree?.nodes.find((n) => n.type === "subagent" && n.title === "子代理：spawn" && n.reason?.includes("failed: boom"));
+check("subagent 失败自动结论", subNode !== void 0 && subNode.conclusion === "failed");
+check("子代理节点补全任务（desc = 首条 user 消息）", subNode !== void 0 && subNode.desc === "任务：攻击路线 A：构造 K_7 极小反例", subNode?.desc);
+check("失败子代理保留失败原因（不覆盖）", subNode !== void 0 && subNode.reason === "子代理失败：failed: boom", subNode?.reason);
+const subNode2 = autoTree?.nodes.find((n) => n.type === "subagent" && n.reason === "结果：路线 B 的证明缺口闭合，写了 3 页推导");
+check("子代理节点补全结果（reason = 最终输出截取）", subNode2 !== void 0);
+check("无任务缓冲的子代理 desc 留空", subNode2 !== void 0 && (subNode2.desc === null || subNode2.desc === ""));
 
 // ── 跨会话续接：list / resume ────────────────────────────────────────────────
 r = await tool.execute({ action: "list" }, exec);
