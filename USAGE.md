@@ -129,13 +129,13 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 
 ```
 🌳 研究主题：跨域迁移 idea 验证
-├── 计划 方向A：可行性证据链调研          （虚线 = 计划）
-│   └── 探索：方向A                       （实线 = 实际执行）
+├── 计划 方向A：可行性证据链调研          （虚线 = 计划，未定局）
+│   └── 探索：方向A                       （实线 = 有结论/进行中）
 │       └── 子代理：spawn                 （自动挂载）
 ├── 计划 方向B：最小可验证实验
-│   └── 探索：方向B → 失败：数据集不可用   （红色 = 失败 + 原因）
+│   └── 探索：方向B → 走不通：数据集不可用 （红色 = 走不通 + 原因）
 └── 计划 方向C：迁移分析报告
-    └── 探索：方向C → 成功                （绿色 = 成功）
+    └── 探索：方向C → 走通                （绿色 = 走通）
 ```
 
 ---
@@ -149,7 +149,7 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 | `plan-root` | `title`（研究主题） | `treeId`、`newTree` | 建根节点（会话没有树时建树）；`newTree=true` 在同一会话**开一棵新树**（转换研究主题用，旧树保留可切回） |
 | `plan-child` | `title` | `parentId`（默认当前节点）、`treeId` | 画预期分支（计划节点，虚线） |
 | `start` | — | `parentId`（默认当前节点）、`title`、`treeId` | 开实际探索分支（decision 节点，实线）；title 缺省时自动"探索：<父标题>" |
-| `conclude` | `nodeId`、`status`（success/failed/abandoned/blocked） | `reason`、`files` | 记录分支结论与原因 |
+| `conclude` | `nodeId`、`status`（success/failed/abandoned/blocked） | `reason`、`files` | 记录分支结论（线的命运：走通/走不通/没走完/卡住）与原因 |
 | `annotate` | `nodeId` | `title`、`reason`、`files` | 补充说明/关联产出文件 |
 | `plan-mark` | `nodeId`、`relation`（on-track/revised/added） | `title` | 标记计划对照（修订/新增） |
 | `list` | — | — | 列出全部树（treeId/主题/节点数/更新时间/是否归档），供续接检索 |
@@ -160,7 +160,7 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 ### 使用纪律（工具描述中也已写明）
 
 1. 研究开始时先 `plan-root` + `plan-child` 画计划树（先计划后对照）
-2. 分支结束必须 `conclude`（写清失败原因——失败原因比成功更值钱）
+2. 分支结束必须 `conclude`（写清原因——「走不通」的原因比「走通」更值钱）
 3. **并行推进多个分支时，`start`/`plan-child` 必须显式传 `parentId`**，不要依赖"当前节点"默认值
 4. `start` 给具体标题（如"尝试方法X"），不要与计划分支标题重复
 5. 中途才想起建树？随时 `plan-root`，把已做工作从对话历史**补记**成节点（无需复现对话）
@@ -172,7 +172,7 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 
 - 一个 plan 分支下的**全部子节点结束后，plan 自动结束**（不再残留"进行中"）
 - **计划自动汇总结论**：plan 收尾时自动统计子任务结论显示在节点上，
-  如"子任务完成：2 成功、1 失败"（无结论的计入"未标注"，不替你下判断）
+  如"子任务完成：2 走通、1 走不通"（无结论的计入"未标注"，不替你下判断）
 - 无 goal 会话：全部子节点静止后 **root 自动结束**
 - **goal 完成/阻塞时：整树收尾**——所有"进行中"节点自动结束（显示"已结束"）
 - **启动静态收尾**：每次 DSH 重启时自动修正历史数据里"任务已完成但节点仍进行中"的残留
@@ -206,9 +206,10 @@ ln -s /绝对路径/dsh-ExploreTree "$HOME/.dsh/profiles/web/node_modules/resear
 
 ### 节点
 
-- **颜色** = 状态：绿=成功 / 红=失败 / 橙=阻塞 / 灰=放弃 / 蓝脉冲=进行中 / 浅灰=未开始
-- **线型** = 类型（右下角图例两行分区）：**实线** = 执行/探索、**虚线** = 计划（还没落地）、**黄色虚线** = 修订过的计划
-- 左上角角标：`改`（计划已修正）/ `新`（计划外新增）
+- **颜色 = 线的命运**：绿=走通 / 红=走不通 / 橙=卡住 / 灰=没走完 / 蓝脉冲=进行中 / 浅灰=未开始
+- **线型 = 是否定局**（右下角图例）：**实线** = 有结论/进行中（走通和走不通都是"有结论"）；
+  **虚线** = 未定局（计划还没落地、卡住、没走完、未开始）；**黄色虚线** = 修订过的计划
+- 左上角角标：✕（此路不通）/ `改`（计划已修正）/ `新`（计划外新增）
 - 右上角 +/−：折叠/展开子树
 - **悬停**：浮层显示详情（类型/状态/结论/汇总/原因/计划对照/轮次/起止时间/产出文件）
 - **点击**：固定详情（浮层右上角 ✕ 或点击空白取消；悬停其他节点时固定框变半透明以示区分）
@@ -294,8 +295,8 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
       "parentId": "n0 | null",
       "title": "方向A：尝试X方法",
       "status": "pending | running | ended",        // 自动状态
-      "conclusion": "success | failed | abandoned | blocked | null",  // 显式结论
-      "reason": "失败原因… | 计划汇总（子任务完成：N 成功）| null",
+      "conclusion": "success | failed | abandoned | blocked | null",  // 显式结论（线的命运：走通/走不通/没走完/卡住）
+      "reason": "走不通的原因… | 计划汇总（子任务完成：N 走通）| null",
       "planRelation": "on-track | revised | added | null",
       "files": ["research-vault/…"],
       "startedAt": "ISO-8601 | null",
@@ -309,7 +310,10 @@ agent：        tree_node list          # 找到旧树（按主题/更新时间�
 }
 ```
 
-- 状态语义：`status` 是机器事实（运行中/已结束）；`conclusion` 是研究判断（成功/失败/放弃/阻塞 + 原因），两者并存
+- 状态语义：`status` 是机器事实（运行中/已结束）；`conclusion` 是**研究判断（线的命运）**——
+  走通（success）/ 走不通（failed）/ 没走完（abandoned）/ 卡住（blocked）+ 原因，两者并存。
+  注意：这是**这条探索线的结局**，不是对"猜想是否成立"的判定——走通和走不通都是
+  "有结论"（科研产出，UI 实线），没走完和卡住是"未定局"（UI 虚线）
 - 文件可直接编辑（改完重启服务或等 agent 下次操作时重新加载——注意：服务运行期间以内存为准，改文件需重启）
 
 ---

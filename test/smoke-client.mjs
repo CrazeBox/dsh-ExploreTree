@@ -100,6 +100,13 @@ check("失败节点状态映射", D.nodeState(step1) === "failed");
 check("失败节点副标题 = 原因", D.nodeDesc(step1) === "收敛性差");
 const step2 = nodes.find((n) => n.id === "step-2");
 check("进行中节点副标题", D.nodeDesc(step2) === "进行中…");
+// 结论语义 = 线的命运：无 reason 时按命运给默认副标题
+const fate = (conclusion) => ({ id: "x", type: "decision", parentId: null, title: "t", status: "ended", conclusion, reason: null, planRelation: null });
+check("走不通（无原因）副标题 = 此路不通", D.nodeDesc(fate("failed")) === "此路不通");
+check("没走完副标题", D.nodeDesc(fate("abandoned")) === "没走完");
+check("卡住副标题", D.nodeDesc(fate("blocked")) === "暂时卡住");
+check("走通副标题", D.nodeDesc(fate("success")) === "走通");
+check("状态文案 = 线的命运（走通/走不通/卡住/没走完）", D.STATE_LABELS.success === "走通" && D.STATE_LABELS.failed === "走不通" && D.STATE_LABELS.blocked === "卡住" && D.STATE_LABELS.abandoned === "没走完");
 check("截断函数", D.truncate("一二三四五六七八九十", 6) === "一二三四五…");
 check("六种状态色齐全", Object.keys(D.STATE_COLORS).length === 6 && Object.keys(D.STATE_LABELS).length === 6);
 
